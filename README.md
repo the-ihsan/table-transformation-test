@@ -1,69 +1,135 @@
-# React + TypeScript + Vite
+# Table Transformer Playground
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An interactive web app for **editing, merging, and transforming tables** with custom rules.
+It provides both a **visual table editor** and a **Monaco-powered IDE** where you can experiment with your own transformation logic.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
 
-## Expanding the ESLint configuration
+### 📝 Table Editor
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+* Create tables with custom number of rows and columns.
+* Merge cells (`rowSpan`, `colSpan`) with a drag-select + **Merge Cells** action.
+* Split merged cells back into individual cells.
+* Export the current table state as JSON.
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 🔄 Transformation Controls
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+* **Transform** → transpose the table (rows ↔ columns, with spans swapped).
+* **Repeat First** → repeat the first column/row in each grouping.
+* **Column Count (N)** → control how many columns the transformed table should have.
+* **Overflow Clipping** → if a cell’s `colSpan` exceeds the boundary of `N`, it’s clipped and continued in the next row with blank filler cells.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 💻 Custom Logic IDE
+
+* Built-in **Monaco Editor** lets you write your own transformation function.
+* Provided with a default `getTransformedTable` implementation for reference.
+* Write, test, and compare your custom logic against the default one.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+* Node.js (>= 18)
+* pnpm or npm
+
+### Installation
+
+```bash
+git clone https://github.com/the-ihsan/table-transformation-test.git
+cd table-transformation-test
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+* Runs on [Vite](https://vitejs.dev) + React + TailwindCSS.
+* UI components from [shadcn/ui](https://ui.shadcn.com).
+* Monaco Editor integrated for live coding experience.
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 📖 Usage
+
+1. **Edit Table**
+
+   * Use the toolbar to merge or split cells.
+   * Change row/column count from controls.
+
+2. **Transform Table**
+
+   * Toggle `Transform` (transpose).
+   * Toggle `Repeat First`.
+   * Adjust `Column Count`.
+   * See the transformed preview instantly.
+
+3. **Experiment with Logic**
+
+   * Open Monaco editor pane.
+   * Write your own `getTransformedTable` function.
+   * Run and compare the output with the provided implementation.
+
+---
+
+## 🧩 Example
+
+### Input Table
+
 ```
+1 2 3
+4 5 6
+7 8 9
+```
+
+### Config
+
+* Transform: false
+* Repeat First: true
+* Column Count: 2
+
+### Output
+
+```
+1 4
+2 5
+3 6
+1 7
+2 8
+3 9
+```
+
+---
+
+## 📐 Clipping Rule (Important!)
+
+When a cell’s **colSpan** exceeds the target **Column Count (N)**, the cell must be **clipped**.
+
+* The visible part fits in the current row.
+* The remaining span is continued as a **blank cell** in the next row(s).
+
+### Example
+
+* Cell with `colSpan = 3` placed in a table with `N = 2`.
+* Current column index = `1`.
+
+```
+Before:
+[ A (colSpan=3) ]
+```
+
+```
+After clipping (N=2):
+Row 1: [ A (colSpan=1) ][ A (colSpan=1) ]
+Row 2: [ "" (colSpan=1) ]
+```
+
+The blank cell carries the same `rowSpan`, but has no value.
+
+This ensures:
+
+* Tables remain rectangular.
+* Spans never overflow past the boundary.
