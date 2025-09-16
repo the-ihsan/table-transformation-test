@@ -5,11 +5,11 @@ import { Header } from "@/components/header";
 import InputAndProjection from "@/components/input-and-projection";
 import { CodeEditor } from "@/components/code-editor";
 import { TestResultsModal } from "@/components/test-results-modal";
-import type { TransformConfig } from "@/lib/types";
-import { executeUserCode } from "@/lib/code-executor";
+import type { Cell, TransformConfig } from "@/lib/types";
 import { appStorage } from "@/lib/storage";
 import Output from "./output";
-import { cn } from "@/lib/utils";
+import { cn, initializeTable } from "@/lib/utils";
+import { executeUserCode } from "@/lib/code-executor";
 
 const defaultCode = {
   typescript: `interface Config {
@@ -17,10 +17,10 @@ const defaultCode = {
     repeatFirst: boolean;
     columnCount: number;
 }
-function transformTable(table: HTMLTableElement, config: Config): HTMLTableElement {
+function main(table: HTMLTableElement, config: Config): HTMLTableElement {
   return table;
 }`,
-  javascript: `function transformTable(table) {
+  javascript: `function main(table) {
   return table;
 }`,
 };
@@ -38,7 +38,13 @@ export function TableEditor() {
   const [isTypeScript, setIsTypeScript] = useState(() =>
     appStorage.loadLanguage(true)
   );
-  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [table, setTable] = useState<Cell[][]>(() => {
+    const persistedTable = appStorage.loadTableData([]);
+    // If we have persisted table data, use it; otherwise initialize with persisted dimensions
+    return persistedTable.length > 0
+      ? persistedTable
+      : initializeTable(3, 3);
+  });
   const [config, setConfig] = useState<TransformConfig>(() =>
     appStorage.loadConfig({
       transpose: false,
@@ -112,41 +118,11 @@ export function TableEditor() {
   };
 
   const onRunCode = () => {
-    const table = tableRef.current?.cloneNode(true) as HTMLTableElement;
-    if (!table) {
-      return;
-    }
-
-    console.log("Running code", table);
-
-    try {
-      const result = executeUserCode(code, isTypeScript, table, config);
-
-      if (result.success) {
-        if (result.isTableElement) {
-          // Output is a valid table element
-          setOutput(result.output || "");
-          console.log(
-            "✅ Code executed successfully - output is a table element"
-          );
-        } else {
-          // Output is not a table element
-          setOutput(`⚠️ Output is not a table element:\n\n${result.output}`);
-          console.log(
-            "⚠️ Code executed but output is not a table element:",
-            result.output
-          );
-        }
-      } else {
-        // Error occurred (transpilation or execution)
-        setOutput(`❌ Error: ${result.error}`);
-        console.error("❌ Code execution failed:", result.error);
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      setOutput(`❌ Unexpected Error: ${errorMessage}`);
-      console.error("❌ Unexpected error:", error);
+    const result = executeUserCode(code, isTypeScript, table, config);
+    if (result.success) {
+      setOutput(result.output.outerHTML);
+    } else {
+      setOutput(result.error);
     }
   };
 
@@ -155,11 +131,6 @@ export function TableEditor() {
   };
 
   const runCurrentTest = () => {
-    const table = tableRef.current?.cloneNode(true) as HTMLTableElement;
-    if (!table) {
-      return;
-    }
-
     setTestType('current');
     setTestModalTitle("Current Input Test");
     setIsTestModalOpen(true);
@@ -191,7 +162,8 @@ export function TableEditor() {
           }`}
         >
           <InputAndProjection
-            tableRef={tableRef}
+            table={table}
+            setTable={setTable}
             setConfig={onConfigChange}
             config={config}
             className={showInput ? "" : "hidden"}
@@ -220,11 +192,13 @@ export function TableEditor() {
         isOpen={isTestModalOpen}
         onClose={() => setIsTestModalOpen(false)}
         title={testModalTitle}
-        testType={testType}
         code={code}
         isTypeScript={isTypeScript}
-        config={config}
-        table={testType === 'current' ? tableRef.current?.cloneNode(true) as HTMLTableElement : undefined}
+        testCase={testType === 'current' ? {
+          table: JSON.parse(JSON.stringify(table)),
+          config,
+          hasMergedCells: false,
+        } : undefined}
       />
     </div>
   );

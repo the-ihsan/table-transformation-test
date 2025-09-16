@@ -82,6 +82,9 @@ export const transformTable = (
       const colspan = cell.colSpan;
       const left = columnCount - subRowOfRow[r].filled;
       const spaceUsed = Math.min(colspan, left);
+      if (spaceUsed === 0) {
+        console.log('Space used is 0');
+      }
       subRowObj.filled += 1;
       if (spaceUsed < colspan) {
         cell.colSpan = spaceUsed;
@@ -95,6 +98,10 @@ export const transformTable = (
           shadow: true,
         };
         table[r][c + spaceUsed] = fillerProps;
+        // console.log("Testxx: ");
+        // console.table(fillerProps);
+        // console.table(cell);
+        
       }
 
       if (subRow.length === columnCount) {
@@ -108,6 +115,7 @@ export const transformTable = (
       }
     }
   }
+  
 
   const isEdgeRow: Record<number, boolean> = {};
   const newTable: Cell[][] = [];

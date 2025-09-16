@@ -1,17 +1,16 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import type { Cell, MergeBoundary } from "./types"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+import type { Cell, MergeBoundary, TransformConfig } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
-
 export const initializeTable = (rows: number, cols: number): Cell[][] => {
-  const table: Cell[][] = []
-  let counter = 1
+  const table: Cell[][] = [];
+  let counter = 1;
   for (let i = 0; i < rows; i++) {
-    const row: Cell[] = []
+    const row: Cell[] = [];
     for (let j = 0; j < cols; j++) {
       row.push({
         value: counter.toString(),
@@ -20,14 +19,14 @@ export const initializeTable = (rows: number, cols: number): Cell[][] => {
         hidden: false,
         col: j,
         row: i,
-      })
-      counter++
+        shadow: false,
+      });
+      counter++;
     }
-    table.push(row)
+    table.push(row);
   }
-  return table
-}
-
+  return table;
+};
 
 export const adjustMergeBoundary = (
   table: Cell[][],
@@ -37,7 +36,7 @@ export const adjustMergeBoundary = (
     const cells = table[r];
     for (let c = 0; c < cells.length; c++) {
       const cellId = cells[c];
-      const { col, rowSpan, colSpan, hidden } = cellId
+      const { col, rowSpan, colSpan, hidden } = cellId;
 
       if (hidden) {
         continue;
@@ -85,72 +84,97 @@ export const adjustMergeBoundary = (
   return boundary;
 };
 
-
 export const parseTable = (table: HTMLTableElement): Cell[][] => {
   const rows = table.querySelectorAll("tr");
   const rowCount = rows.length;
   let colCount = 0;
   for (let i = 0; i < rows[0].children.length; i++) {
-    colCount+= (rows[0].children[i] as HTMLTableCellElement).colSpan;
+    colCount += (rows[0].children[i] as HTMLTableCellElement).colSpan;
   }
-  const tableData: Cell[][] = Array.from({ length: rowCount }, (_, j) => Array.from({ length: colCount }, (_, i) => ({
-    value: "",
-    rowSpan: 1,
-    colSpan: 1,
-    hidden: false,
-    col: i,
-    row: j,
-  })));
 
-  const hasFilled: Record<number, Record<number, boolean>> = {};
+  const tableRec: Record<number, Record<number, Cell>> = {};
+  const futColInit: Record<number, number> = {};
 
   for (let i = 0; i < rowCount; i++) {
     const row = rows[i];
+    tableRec[i] = tableRec[i] || {};
+    let col = futColInit[i] || 0;
+    for (let j = 0; j < row.children.length; j++) {
+      const cell = row.children[j] as HTMLTableCellElement;
+      tableRec[i][col] = {
+        value: cell.textContent!,
+        rowSpan: cell.rowSpan,
+        colSpan: cell.colSpan,
+        hidden: false,
+        col: col,
+        row: i,
+        shadow: false,
+      };
 
-    const cellCount = row.cells.length;
-    const cellOrder = tableData[i];
-    let col = 0;
-
-    for (let j = 0; j < cellCount; j++) {
-      while (hasFilled[i]?.[col]) col++;
-      const cell = row.cells[j];
-      const cellData = cellOrder[col];
-
-      
-
-      const colSpan = cell.colSpan || 1;
-      const rowSpan = cell.rowSpan || 1;
-      
-
-      // If the current cell is merged into later columns, we need to add the blank cells to the cell order
-      if (colSpan > 1) {
-        hasFilled[i] ||= {};
-        for (let k = 1; k < colSpan; k++) {
-          const bCol = col + k;
-          const blankCell = cellOrder[bCol];
-          blankCell.hidden = true;
-          blankCell.value = cellData.value;
-          hasFilled[i][bCol] = true;
+      const colSpan = cell.colSpan;
+      const rowSpan = cell.rowSpan;
+      if (colSpan > 1 || rowSpan > 1) {
+        for (let l = 0; l < rowSpan; l++) {
+          for (let k = 0; k < colSpan; k++) {
+            if (l === 0 && k === 0) continue;
+            tableRec[i + l] = tableRec[i + l] || {};
+            tableRec[i + l][col + k] = {
+              value: cell.textContent!,
+              rowSpan: 1,
+              colSpan: 1,
+              hidden: true,
+              col: col + k,
+              row: i + l,
+              shadow: false,
+            };
+          }
         }
       }
 
-      // If this cell is merged into later rows, we need to add the blank cells to the cell order
-      for (let k = 1; k < rowSpan; k++) {
-        const bRow = i + k;
-        const blankCellOrder = tableData[bRow];
-        hasFilled[bRow] ||= {};
-        for (let l = 0; l < colSpan; l++) {
-          const bCol = col + l;
-          const blankCell = blankCellOrder[bCol];
-          blankCell.hidden = true;
-          blankCell.value = cellData.value;
-          hasFilled[bRow][bCol] = true;
+      if (rowSpan > 1 && col === 0) {
+        for (let l = 1; l < rowSpan; l++) {
+          futColInit[i + l] = colSpan;
         }
       }
 
       col += colSpan;
     }
   }
+  const finalTable: Cell[][] = [];
+  for (let i = 0; i < rowCount; i++) {
+    const row: Cell[] = [];
+    for (let j = 0; j < colCount; j++) {
+      row.push(tableRec[i][j]);
+    }
+    finalTable.push(row);
+  }
+  return finalTable;
+};
+export const formatTestCaseTitle = (
+  inputData: Cell[][],
+  config: TransformConfig
+) => {
+  return `${inputData.length}x${inputData[0].length} ${
+    config.transpose ? " - Transposed" : ""
+  } ${config.repeatFirst ? " - Repeated" : ""} - ${config.columnCount}`;
+};
 
-  return tableData;
+export const buildTableFromCells = (tableData: Cell[][]): HTMLTableElement => {
+  const table = document.createElement("table");
+  for (let i = 0; i < tableData.length; i++) {
+    const row = document.createElement("tr");
+    for (let j = 0; j < tableData[i].length; j++) {
+      const cellData = tableData[i][j];
+      if (cellData.hidden) {
+        continue;
+      }
+      const cell = document.createElement("td");
+      cell.textContent = cellData.value;
+      cell.colSpan = cellData.colSpan;
+      cell.rowSpan = cellData.rowSpan;
+      row.appendChild(cell);
+    }
+    table.appendChild(row);
+  }
+  return table;
 };

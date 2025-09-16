@@ -1,34 +1,47 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Clock, Loader2, TestTube } from "lucide-react";
 import { useEffect, useState } from "react";
-import { compileAndRunCurrentTest, compileAndRunAllTests, type TestResult } from "@/lib/test-cases";
-import type { TransformConfig } from "@/lib/types";
+import {
+  compileAndRunCurrentTest,
+  compileAndRunAllTests,
+  type FlattenedTestCase,
+} from "@/lib/test-cases";
+
+// Local interface for resolved test results with pending state
+interface ResolvedTestResult {
+  testCase: string;
+  passed?: boolean;
+  error?: string;
+  index: number;
+  isPending: boolean;
+  hasMergedCells: boolean;
+}
 
 interface TestResultsModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  // Test parameters
-  testType: 'current' | 'all';
   code: string;
   isTypeScript: boolean;
-  config: TransformConfig;
-  table?: HTMLTableElement; // Only needed for current test
+  testCase?: FlattenedTestCase;
 }
 
 export function TestResultsModal({
   isOpen,
   onClose,
   title,
-  testType,
   code,
   isTypeScript,
-  config,
-  table,
+  testCase,
 }: TestResultsModalProps) {
-  const [results, setResults] = useState<TestResult[]>([]);
+  const [results, setResults] = useState<ResolvedTestResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Run tests after modal is rendered
@@ -43,54 +56,113 @@ export function TestResultsModal({
       setResults([]);
 
       try {
-        if (testType === 'current' && table) {
-          const result = await compileAndRunCurrentTest(table, config, code, isTypeScript);
-          
-          if (result.success && result.result) {
-            setResults([result.result]);
-          } else {
-            const errorResult: TestResult = {
-              testCase: {
-                table: [],
-                config: config,
-              },
-              passed: false,
-              error: result.error || "Compilation failed",
-              index: 0,
-            };
-            setResults([errorResult]);
-          }
-        } else if (testType === 'all') {
-          const result = await compileAndRunAllTests(code, isTypeScript, (progressResults) => {
-            setResults(progressResults);
+        if (testCase) {
+          // Single test case
+          const testResult = compileAndRunCurrentTest({
+            code,
+            isTypeScript,
+            testCase,
           });
-          
-          if (result.success && result.results) {
-            setResults(result.results);
-          } else {
-            const errorResult: TestResult = {
-              testCase: {
-                table: [],
-                config: config,
-              },
-              passed: false,
-              error: result.error || "Compilation failed",
+
+          // Show pending state immediately
+          setResults([
+            {
+              testCase: testResult.testCase,
               index: 0,
-            };
-            setResults([errorResult]);
+              isPending: true,
+              hasMergedCells: testResult.hasMergedCells,
+            },
+          ]);
+
+          // Resolve the result and update
+          const result = await testResult.result;
+          setResults([
+            {
+              testCase: testResult.testCase,
+              passed: result.passed,
+              error: result.error,
+              index: 0,
+              isPending: false,
+              hasMergedCells: testResult.hasMergedCells,
+            },
+          ]);
+        } else {
+          // All test cases
+          const allTestsResult = await compileAndRunAllTests({
+            code,
+            isTypeScript,
+          });
+          if (!allTestsResult.success) {
+            // Show error state
+            setResults([
+              {
+                testCase: "Compilation",
+                passed: false,
+                error: allTestsResult.error,
+                index: 0,
+                isPending: false,
+                hasMergedCells: false,
+              },
+            ]);
+          } else {
+            // Initialize all tests as pending
+            const initialResults: ResolvedTestResult[] =
+              allTestsResult.results.map((res, index) => ({
+                testCase: res.testCase,
+                index,
+                isPending: true,
+                hasMergedCells: res.hasMergedCells,
+              }));
+            setResults(initialResults);
+
+            // Resolve each test result as it completes
+            allTestsResult.results.forEach(async (testResult, index) => {
+              try {
+                const result = await testResult.result;
+                setResults((prev) =>
+                  prev.map((r, i) =>
+                    i === index
+                      ? {
+                          ...r,
+                          passed: result.passed,
+                          error: result.error,
+                          isPending: false,
+                        }
+                      : r
+                  )
+                );
+              } catch (error) {
+                setResults((prev) =>
+                  prev.map((r, i) =>
+                    i === index
+                      ? {
+                          ...r,
+                          passed: false,
+                          error:
+                            error instanceof Error
+                              ? error.message
+                              : "Unknown error",
+                          isPending: false,
+                        }
+                      : r
+                  )
+                );
+              }
+            });
           }
         }
       } catch (error) {
-        const errorResult: TestResult = {
-          testCase: {
-            table: [],
-            config: config,
+        setResults([
+          {
+            testCase: "Compilation",
+            passed: false,
+            error:
+              error instanceof Error ? error.message : "Unknown error occurred",
+            index: 0,
+            isPending: false,
+            hasMergedCells: false,
           },
-          passed: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-          index: 0,
-        };
-        setResults([errorResult]);
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -99,10 +171,11 @@ export function TestResultsModal({
     // Use setTimeout to ensure modal is fully rendered before starting tests
     const timeoutId = setTimeout(runTests, 100);
     return () => clearTimeout(timeoutId);
-  }, [isOpen, testType, code, isTypeScript, config, table]);
+  }, [isOpen, code, isTypeScript, testCase]);
 
-  const passedCount = results.filter(r => r.passed).length;
-  const failedCount = results.filter(r => !r.passed).length;
+  const passedCount = results.filter((r) => r.passed === true).length;
+  const failedCount = results.filter((r) => r.passed === false).length;
+  const pendingCount = results.filter((r) => r.isPending).length;
   const totalCount = results.length;
 
   return (
@@ -128,7 +201,14 @@ export function TestResultsModal({
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-              <p className="text-gray-600">Running tests...</p>
+              <p className="text-gray-600">
+                {testCase ? "Running single test..." : "Running all tests..."}
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                {testCase
+                  ? "Testing your transformation function"
+                  : "Testing against all test cases"}
+              </p>
             </div>
           </div>
         ) : (
@@ -143,74 +223,116 @@ export function TestResultsModal({
                 <XCircle className="w-5 h-5 text-red-600" />
                 <span className="font-medium">{failedCount} Failed</span>
               </div>
+              {pendingCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                  <span className="font-medium">{pendingCount} Pending</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-gray-600" />
                 <span className="font-medium">{totalCount} Total</span>
               </div>
               <div className="ml-auto">
-                <Badge variant={passedCount === totalCount ? "default" : "destructive"}>
-                  {totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0}% Pass Rate
-                </Badge>
+                {pendingCount > 0 ? (
+                  <Badge variant="secondary">Running...</Badge>
+                ) : (
+                  <Badge
+                    variant={
+                      passedCount === totalCount && failedCount === 0
+                        ? "default"
+                        : "destructive"
+                    }
+                  >
+                    {totalCount > 0
+                      ? Math.round(
+                          (passedCount / (passedCount + failedCount)) * 100
+                        )
+                      : 0}
+                    % Pass Rate
+                  </Badge>
+                )}
               </div>
             </div>
 
             {/* Results List */}
             <div className="flex-1 overflow-auto">
-              <div className="space-y-2">
-                {results.map((result, index) => {
-                  const { testCase, passed, error } = result;
-                  const rows = testCase.table.length;
-                  const cols = testCase.table[0]?.length || 0;
-                  const hasMergedCells = testCase.table.some((row: any[]) =>
-                    row.some((cell: any) => cell.rowSpan > 1 || cell.colSpan > 1)
-                  );
+              {results.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center text-gray-500">
+                    <TestTube className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">
+                      No test results available
+                    </p>
+                    <p className="text-sm">
+                      Tests may have failed to run or no tests were executed.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {results.map((result, index) => {
+                    const {
+                      testCase,
+                      passed,
+                      error,
+                      isPending,
+                      hasMergedCells,
+                    } = result;
 
-                  let configDesc = `${testCase.config.columnCount} cols`;
-                  if (testCase.config.transpose && testCase.config.repeatFirst) {
-                    configDesc += " - Transpose, Repeat";
-                  } else if (testCase.config.transpose) {
-                    configDesc += " - Transpose";
-                  } else if (testCase.config.repeatFirst) {
-                    configDesc += " - Repeat";
-                  }
-
-                  return (
-                    <div
-                      key={index}
-                      className={`p-3 rounded-lg border ${
-                        passed
-                          ? "bg-green-50 border-green-200"
-                          : "bg-red-50 border-red-200"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {passed ? (
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-red-600" />
-                          )}
-                          <div>
-                            <div className="font-medium">
-                              Test #{result.index + 1}: {rows}x{cols}
-                              {hasMergedCells ? " (merged)" : ""}
+                    return (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border ${
+                          isPending
+                            ? "bg-blue-50 border-blue-200"
+                            : passed
+                            ? "bg-green-50 border-green-200"
+                            : "bg-red-50 border-red-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {isPending ? (
+                              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                            ) : passed ? (
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                            ) : (
+                              <XCircle className="w-5 h-5 text-red-600" />
+                            )}
+                            <div>
+                              <div className="font-medium">
+                                {testCase}
+                                {hasMergedCells ? " (merged)" : ""}
+                              </div>
+                              {error && (
+                                <div className="font-medium mb-1 text-red-800">
+                                  Error: {error}
+                                </div>
+                              )}
                             </div>
-                            <div className="text-sm text-gray-600">{configDesc}</div>
                           </div>
+                          <Badge
+                            variant={
+                              isPending
+                                ? "secondary"
+                                : passed
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {isPending
+                              ? "RUNNING"
+                              : passed
+                              ? "PASSED"
+                              : "FAILED"}
+                          </Badge>
                         </div>
-                        <Badge variant={passed ? "default" : "destructive"}>
-                          {passed ? "PASSED" : "FAILED"}
-                        </Badge>
                       </div>
-                      {error && (
-                        <div className="mt-2 p-2 bg-red-100 rounded text-sm text-red-800 font-mono">
-                          {error}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Actions */}

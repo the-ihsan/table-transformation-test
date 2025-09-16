@@ -18,29 +18,23 @@ import {
 } from "@radix-ui/react-popover";
 import { Switch } from "@/components/ui/switch";
 
-interface InputAndProjectionProps {
-  tableRef: React.RefObject<HTMLTableElement | null>;
+  interface InputAndProjectionProps {
+  table: Cell[][];
+  setTable: (table: Cell[][]) => void;
   config: TransformConfig;
   setConfig: (config: Partial<TransformConfig>) => void;
   className?: string;
 }
 
 export function InputAndProjection({
-  tableRef,
+  table,
+  setTable,
   config,
   setConfig,
   className,
 }: InputAndProjectionProps) {
   // Load persisted table dimensions
   const persistedDimensions = appStorage.loadTableDimensions(3, 3);
-
-  const [table, setTable] = useState<Cell[][]>(() => {
-    const persistedTable = appStorage.loadTableData([]);
-    // If we have persisted table data, use it; otherwise initialize with persisted dimensions
-    return persistedTable.length > 0
-      ? persistedTable
-      : initializeTable(persistedDimensions.rows, persistedDimensions.cols);
-  });
 
   const [rows, setRows] = useState(persistedDimensions.rows);
   const [cols, setCols] = useState(persistedDimensions.cols);
@@ -405,7 +399,6 @@ export function InputAndProjection({
         </div>
         <div className="flex-1 overflow-auto shadow-sm">
           <table
-            ref={tableRef}
             className="border-collapse w-full"
             onClick={(e) => e.stopPropagation()}
           >

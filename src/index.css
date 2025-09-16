@@ -118,3 +118,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+.output {
+  table {
+    @apply border-collapse w-full table-fixed;
+  }
+  td {
+    @apply border border-gray-300 p-3 min-w-[80px] h-[50px] text-center bg-gray-50;
+  }
+}

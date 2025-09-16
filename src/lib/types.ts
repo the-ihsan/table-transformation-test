@@ -2,10 +2,10 @@ export interface Cell {
   value: string;
   rowSpan: number;
   colSpan: number;
-  hidden?: boolean;
+  hidden: boolean;
   col: number;
   row: number;
-  shadow?: boolean;
+  shadow: boolean;
 }
 
 export interface CellPos {
