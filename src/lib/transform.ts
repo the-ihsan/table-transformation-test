@@ -122,8 +122,5 @@ export const transformTable = (
       }
     }
   }
-
-  console.log(newTable);
-  
   return newTable;
 };
