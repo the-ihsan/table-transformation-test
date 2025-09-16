@@ -10,6 +10,7 @@ import type { Cell, MergeBoundary, TransformConfig } from "@/lib/types";
 import { adjustMergeBoundary, initializeTable } from "@/lib/utils";
 import { transformTable } from "@/lib/transform";
 import { appStorage } from "@/lib/storage";
+import { ALL_TEST_CASES } from "@/lib/test-cases";
 import {
   Popover,
   PopoverContent,
@@ -45,6 +46,7 @@ export function LeftPanel({
   const [currentCell, setCurrentCell] = useState<[number, number] | null>(null);
   const [editingCell, setEditingCell] = useState<[number, number] | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [showTestCases, setShowTestCases] = useState(false);
   const { transpose, repeatFirst, columnCount } = config;
 
   useEffect(() => {
@@ -205,6 +207,36 @@ export function LeftPanel({
     return transformTable(table, columnCount, transpose, repeatFirst);
   }, [table, columnCount, transpose, repeatFirst]);
 
+  // Group test cases by dimension
+  const groupedTestCases = useMemo(() => {
+    const groups: { [key: string]: (typeof ALL_TEST_CASES[0] & { index: number })[] } = {};
+    
+    ALL_TEST_CASES.forEach((testCase, index) => {
+      const rows = testCase.table.length;
+      const cols = testCase.table[0]?.length || 0;
+      const hasMergedCells = testCase.table.some(row => 
+        row.some(cell => cell.rowSpan > 1 || cell.colSpan > 1)
+      );
+      
+      const dimensionKey = `${rows}x${cols}${hasMergedCells ? ' (merged)' : ''}`;
+      
+      if (!groups[dimensionKey]) {
+        groups[dimensionKey] = [];
+      }
+      groups[dimensionKey].push({ ...testCase, index });
+    });
+    
+    return groups;
+  }, []);
+
+  const applyTestCase = useCallback((testCase: typeof ALL_TEST_CASES[0]) => {
+    setTable(testCase.table);
+    setConfig(testCase.config);
+    setRows(testCase.table.length);
+    setCols(testCase.table[0]?.length || 0);
+    setShowTestCases(false);
+  }, [setConfig]);
+
   const hasRepeatFirstError = repeatFirst && columnCount < 2;
 
   return (
@@ -295,10 +327,69 @@ export function LeftPanel({
                 Split
               </Button>
               <div className="w-px h-6 bg-gray-300"></div>
-              <Button variant="outline" size="sm">
-                <TestTube className="w-4 h-4 mr-2" />
-                Test Cases
-              </Button>
+              <Popover open={showTestCases} onOpenChange={setShowTestCases}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <TestTube className="w-4 h-4 mr-2" />
+                    Test Cases
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-96 max-h-96 overflow-auto p-4 bg-white shadow-lg rounded-lg"
+                  align="end"
+                >
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900">
+                      Test Cases ({ALL_TEST_CASES.length} total)
+                    </h3>
+                    <div className="space-y-3">
+                      {Object.entries(groupedTestCases).map(([dimension, testCases]) => (
+                        <div key={dimension} className="space-y-2">
+                          <h4 className="text-sm font-medium text-gray-700 border-b pb-1">
+                            {dimension} ({testCases.length} cases)
+                          </h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {testCases.map((testCase, idx) => {
+                              const overallIndex = testCase.index + 1;
+                              const rows = testCase.table.length;
+                              const cols = testCase.table[0]?.length || 0;
+                              const dimension = `${rows}x${cols}`;
+                              
+                              let title = `${overallIndex}. ${dimension}`;
+                              
+                              if (testCase.config.transpose && testCase.config.repeatFirst) {
+                                title += ` - Transpose, Repeat, ${testCase.config.columnCount}`;
+                              } else if (testCase.config.transpose) {
+                                title += ` - Transpose, ${testCase.config.columnCount}`;
+                              } else if (testCase.config.repeatFirst) {
+                                title += ` - Repeat, ${testCase.config.columnCount}`;
+                              } else {
+                                title += ` - ${testCase.config.columnCount}`;
+                              }
+                              
+                              return (
+                                <Button
+                                  key={`${dimension}-${idx}`}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs h-8 justify-start"
+                                  onClick={() => applyTestCase(testCase)}
+                                >
+                                  <div className="text-left">
+                                    <div className="font-medium">
+                                      {title}
+                                    </div>
+                                  </div>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           <div className="flex-1 overflow-auto shadow-sm">
