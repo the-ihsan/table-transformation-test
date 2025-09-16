@@ -2,7 +2,7 @@ import Editor from "@monaco-editor/react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "./ui/button";
-import { Play } from "lucide-react";
+import { Play, TestTube, TestTube2 } from "lucide-react";
 
 interface CodeEditorProps {
   code: string;
@@ -10,6 +10,8 @@ interface CodeEditorProps {
   isTypeScript: boolean;
   onTypeScriptChange: (isTypeScript: boolean) => void;
   onRunCode: () => void;
+  onRunCurrentTest: () => void;
+  onRunAllTests: () => void;
   className?: string;
 }
 
@@ -19,6 +21,8 @@ export function CodeEditor({
   isTypeScript,
   onTypeScriptChange,
   onRunCode,
+  onRunCurrentTest,
+  onRunAllTests,
   className,
 }: CodeEditorProps) {
   const handleCodeChange = (value: string | undefined) => {
@@ -33,7 +37,13 @@ export function CodeEditor({
         </h2>
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="sm" onClick={onRunCode}>
-            <Play className="w-4 h-4" /> Run Code
+            <Play className="w-4 h-4" /> Preview
+          </Button>
+          <Button variant="outline" size="sm" onClick={onRunCurrentTest}>
+            <TestTube className="w-4 h-4" /> Test Current
+          </Button>
+          <Button variant="outline" size="sm" onClick={onRunAllTests}>
+            <TestTube2 className="w-4 h-4" /> Test All
           </Button>
           <Label htmlFor="typescript-switch" className="text-sm font-medium">
             TypeScript

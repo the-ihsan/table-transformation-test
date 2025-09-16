@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/header";
 import InputAndProjection from "@/components/input-and-projection";
 import { CodeEditor } from "@/components/code-editor";
+import { TestResultsModal } from "@/components/test-results-modal";
 import type { TransformConfig } from "@/lib/types";
 import { executeUserCode } from "@/lib/code-executor";
 import { appStorage } from "@/lib/storage";
@@ -46,6 +47,11 @@ export function TableEditor() {
     })
   );
   const [output, setOutput] = useState("");
+
+  // Test state
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const [testModalTitle, setTestModalTitle] = useState("");
+  const [testType, setTestType] = useState<'current' | 'all'>('current');
 
   // Visibility state for different sections
   const [showInput, setShowInput] = useState(true);
@@ -148,6 +154,23 @@ export function TableEditor() {
     setConfig({ ...config, ...cfg });
   };
 
+  const runCurrentTest = () => {
+    const table = tableRef.current?.cloneNode(true) as HTMLTableElement;
+    if (!table) {
+      return;
+    }
+
+    setTestType('current');
+    setTestModalTitle("Current Input Test");
+    setIsTestModalOpen(true);
+  };
+
+  const runAllTestsHandler = () => {
+    setTestType('all');
+    setTestModalTitle("All Tests");
+    setIsTestModalOpen(true);
+  };
+
   const halfCodeEditor = showInput || showOutput;
 
   return (
@@ -182,6 +205,8 @@ export function TableEditor() {
             isTypeScript={isTypeScript}
             onTypeScriptChange={onTypeScriptChange}
             onRunCode={onRunCode}
+            onRunCurrentTest={runCurrentTest}
+            onRunAllTests={runAllTestsHandler}
             className={cn({
               hidden: !showCodeEditor,
               "w-1/2": halfCodeEditor,
@@ -190,6 +215,17 @@ export function TableEditor() {
           />
         )}
       </div>
+      
+      <TestResultsModal
+        isOpen={isTestModalOpen}
+        onClose={() => setIsTestModalOpen(false)}
+        title={testModalTitle}
+        testType={testType}
+        code={code}
+        isTypeScript={isTypeScript}
+        config={config}
+        table={testType === 'current' ? tableRef.current?.cloneNode(true) as HTMLTableElement : undefined}
+      />
     </div>
   );
 }

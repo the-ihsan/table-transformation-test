@@ -1,3 +1,7 @@
+import { transformTable } from "./transform";
+import { parseTable } from "./utils";
+import { compileUserCode, executeCompiledFunction, type CompiledFunction } from "./code-executor";
+
 // ---------- Types ----------
 export interface Cell {
   value: string;
@@ -67,6 +71,7 @@ function applySpans(
       for (let c = col; c < col + colSpan && c < table[0].length; c++) {
         if (r === row && c === col) continue;
         table[r][c].hidden = true;
+        table[r][c].value = cell.value;
       }
     }
   });
@@ -132,3 +137,264 @@ export const ALL_TEST_CASES: FlattenedTestCase[] = testCases
   .flat();
 
 export default ALL_TEST_CASES;
+
+export const runTest = (
+  input: Cell[][],
+  config: TransformConfig,
+  output: HTMLTableElement
+) => {
+  const outputTable = parseTable(output);
+  const expectedTable = transformTable(input, config);
+  return JSON.stringify(outputTable) === JSON.stringify(expectedTable);
+};
+
+// ---------- Test Result Types ----------
+export interface TestResult {
+  testCase: {
+    table: Cell[][];
+    config: TransformConfig;
+  };
+  passed: boolean;
+  error?: string;
+  index: number;
+}
+
+// ---------- Test Runner Functions ----------
+
+/**
+ * Creates a table element from test case data
+ */
+function createTableFromTestCase(testCase: FlattenedTestCase): HTMLTableElement {
+  const tableElement = document.createElement('table');
+  const tbody = document.createElement('tbody');
+  
+  testCase.table.forEach(row => {
+    const tr = document.createElement('tr');
+    row.forEach(cell => {
+      if (!cell.hidden) {
+        const td = document.createElement('td');
+        td.textContent = cell.value;
+        if (cell.rowSpan > 1) td.setAttribute('rowspan', cell.rowSpan.toString());
+        if (cell.colSpan > 1) td.setAttribute('colspan', cell.colSpan.toString());
+        tr.appendChild(td);
+      }
+    });
+    tbody.appendChild(tr);
+  });
+  
+  tableElement.appendChild(tbody);
+  return tableElement;
+}
+
+/**
+ * Runs a single test case using a compiled function
+ */
+export async function runSingleTest(
+  testCase: FlattenedTestCase,
+  compiledFunction: CompiledFunction,
+  index: number
+): Promise<TestResult> {
+  try {
+    // Create a table element from the test case
+    const tableElement = createTableFromTestCase(testCase);
+    
+    // Execute the compiled function
+    const result = executeCompiledFunction(compiledFunction, tableElement, testCase.config);
+    
+    if (result.success && result.isTableElement) {
+      // Parse the output table
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(result.output || "", 'text/html');
+      const outputTable = doc.querySelector('table') as HTMLTableElement;
+      
+      if (outputTable) {
+        // Run the test
+        const inputTableData = parseTable(tableElement);
+        const passed = runTest(inputTableData, testCase.config, outputTable);
+        
+        return {
+          testCase: testCase,
+          passed,
+          index: index,
+        };
+      } else {
+        return {
+          testCase: testCase,
+          passed: false,
+          error: "Output is not a valid table element",
+          index: index,
+        };
+      }
+    } else {
+      return {
+        testCase: testCase,
+        passed: false,
+        error: result.error || "Code execution failed",
+        index: index,
+      };
+    }
+  } catch (error) {
+    return {
+      testCase: testCase,
+      passed: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      index: index,
+    };
+  }
+}
+
+/**
+ * Runs a test on the current input table using a compiled function
+ */
+export async function runCurrentInputTest(
+  table: HTMLTableElement,
+  config: TransformConfig,
+  compiledFunction: CompiledFunction
+): Promise<TestResult> {
+  try {
+    // Execute the compiled function
+    const result = executeCompiledFunction(compiledFunction, table, config);
+    
+    if (result.success && result.isTableElement) {
+      // Parse the output table
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(result.output || "", 'text/html');
+      const outputTable = doc.querySelector('table') as HTMLTableElement;
+
+      const inputTableData = parseTable(table);
+      if (outputTable) {
+        // Run the test
+        const passed = runTest(inputTableData, config, outputTable);
+        
+        return {
+          testCase: {
+            table: inputTableData,
+            config: config,
+          },
+          passed,
+          index: 0,
+        };
+      } else {
+        return {
+          testCase: {
+            table: parseTable(table),
+            config: config,
+          },
+          passed: false,
+          error: "Output is not a valid table element",
+          index: 0,
+        };
+      }
+    } else {
+      return {
+        testCase: {
+          table: parseTable(table),
+          config: config,
+        },
+        passed: false,
+        error: result.error || "Code execution failed",
+        index: 0,
+      };
+    }
+  } catch (error) {
+    return {
+      testCase: {
+        table: parseTable(table),
+        config: config,
+      },
+      passed: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      index: 0,
+    };
+  }
+}
+
+/**
+ * Runs all test cases using a compiled function
+ */
+export async function runAllTests(
+  compiledFunction: CompiledFunction,
+  onProgress?: (results: TestResult[]) => void
+): Promise<TestResult[]> {
+  const results: TestResult[] = [];
+
+  for (let i = 0; i < ALL_TEST_CASES.length; i++) {
+    const testCase = ALL_TEST_CASES[i];
+    const result = await runSingleTest(testCase, compiledFunction, i);
+    results.push(result);
+    
+    // Update progress if callback provided
+    if (onProgress) {
+      onProgress([...results]);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Compiles code and runs all tests
+ */
+export async function compileAndRunAllTests(
+  code: string,
+  isTypeScript: boolean,
+  onProgress?: (results: TestResult[]) => void
+): Promise<{ success: boolean; results?: TestResult[]; error?: string }> {
+  // Compile the code once
+  const compilationResult = compileUserCode(code, isTypeScript);
+  
+  if (!compilationResult.success) {
+    return {
+      success: false,
+      error: compilationResult.error,
+    };
+  }
+
+  // Run all tests with the compiled function
+  try {
+    const results = await runAllTests(compilationResult.compiledFunction!, onProgress);
+    return {
+      success: true,
+      results,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Compiles code and runs current input test
+ */
+export async function compileAndRunCurrentTest(
+  table: HTMLTableElement,
+  config: TransformConfig,
+  code: string,
+  isTypeScript: boolean
+): Promise<{ success: boolean; result?: TestResult; error?: string }> {
+  // Compile the code once
+  const compilationResult = compileUserCode(code, isTypeScript);
+  
+  if (!compilationResult.success) {
+    return {
+      success: false,
+      error: compilationResult.error,
+    };
+  }
+
+  // Run the test with the compiled function
+  try {
+    const result = await runCurrentInputTest(table, config, compilationResult.compiledFunction!);
+    return {
+      success: true,
+      result,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

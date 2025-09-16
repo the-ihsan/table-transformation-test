@@ -84,3 +84,73 @@ export const adjustMergeBoundary = (
   }
   return boundary;
 };
+
+
+export const parseTable = (table: HTMLTableElement): Cell[][] => {
+  const rows = table.querySelectorAll("tr");
+  const rowCount = rows.length;
+  let colCount = 0;
+  for (let i = 0; i < rows[0].children.length; i++) {
+    colCount+= (rows[0].children[i] as HTMLTableCellElement).colSpan;
+  }
+  const tableData: Cell[][] = Array.from({ length: rowCount }, (_, j) => Array.from({ length: colCount }, (_, i) => ({
+    value: "",
+    rowSpan: 1,
+    colSpan: 1,
+    hidden: false,
+    col: i,
+    row: j,
+  })));
+
+  const hasFilled: Record<number, Record<number, boolean>> = {};
+
+  for (let i = 0; i < rowCount; i++) {
+    const row = rows[i];
+
+    const cellCount = row.cells.length;
+    const cellOrder = tableData[i];
+    let col = 0;
+
+    for (let j = 0; j < cellCount; j++) {
+      while (hasFilled[i]?.[col]) col++;
+      const cell = row.cells[j];
+      const cellData = cellOrder[col];
+
+      
+
+      const colSpan = cell.colSpan || 1;
+      const rowSpan = cell.rowSpan || 1;
+      
+
+      // If the current cell is merged into later columns, we need to add the blank cells to the cell order
+      if (colSpan > 1) {
+        hasFilled[i] ||= {};
+        for (let k = 1; k < colSpan; k++) {
+          const bCol = col + k;
+          const blankCell = cellOrder[bCol];
+          blankCell.hidden = true;
+          blankCell.value = cellData.value;
+          hasFilled[i][bCol] = true;
+        }
+      }
+
+      // If this cell is merged into later rows, we need to add the blank cells to the cell order
+      for (let k = 1; k < rowSpan; k++) {
+        const bRow = i + k;
+        const blankCellOrder = tableData[bRow];
+        hasFilled[bRow] ||= {};
+        for (let l = 0; l < colSpan; l++) {
+          const bCol = col + l;
+          const blankCell = blankCellOrder[bCol];
+          blankCell.hidden = true;
+          blankCell.value = cellData.value;
+          hasFilled[bRow][bCol] = true;
+        }
+      }
+
+      col += colSpan;
+    }
+  }
+
+  return tableData;
+};
