@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/header";
 import InputAndProjection from "@/components/input-and-projection";
 import { CodeEditor } from "@/components/code-editor";

@@ -1,5 +1,5 @@
 import { transformTable } from "./transform";
-import { buildTableFromCells, formatTestCaseTitle, parseTable } from "./utils";
+import { buildTableFromCells, formatTestCaseTitle } from "./utils";
 import {
   complileCode,
   executeCompiledFunction,
