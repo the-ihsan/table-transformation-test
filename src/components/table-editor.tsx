@@ -6,6 +6,7 @@ import { LeftPanel } from "@/components/left-panel";
 import { CodeEditor } from "@/components/code-editor";
 import type { TransformConfig } from "@/lib/types";
 import { executeUserCode } from "@/lib/code-executor";
+import { appStorage } from "@/lib/storage";
 
 const defaultCode = {
   typescript: `interface Config {
@@ -22,14 +23,22 @@ function transformTable(table: HTMLTableElement, config: Config): HTMLTableEleme
 };
 
 export function TableEditor() {
-  const [code, setCode] = useState(defaultCode.typescript);
-  const [isTypeScript, setIsTypeScript] = useState(true);
-  const tableRef = useRef<HTMLTableElement | null>(null);
-  const [config, setConfig] = useState<TransformConfig>({
-    transpose: false,
-    repeatFirst: false,
-    columnCount: 3,
+  // Load persisted data on component mount
+  const [code, setCode] = useState(() => {
+    const savedLanguage = appStorage.loadLanguage(true);
+    const defaultCodeToUse = savedLanguage ? defaultCode.typescript : defaultCode.javascript;
+    return appStorage.loadCode(defaultCodeToUse);
   });
+  
+  const [isTypeScript, setIsTypeScript] = useState(() => appStorage.loadLanguage(true));
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [config, setConfig] = useState<TransformConfig>(() => 
+    appStorage.loadConfig({
+      transpose: false,
+      repeatFirst: false,
+      columnCount: 3,
+    })
+  );
   const [output, setOutput] = useState("");
 
   // Check if screen width is less than 800px
@@ -44,6 +53,21 @@ export function TableEditor() {
     window.addEventListener("resize", checkScreenSize);
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
+
+  // Persist code changes
+  useEffect(() => {
+    appStorage.saveCode(code);
+  }, [code]);
+
+  // Persist language changes
+  useEffect(() => {
+    appStorage.saveLanguage(isTypeScript);
+  }, [isTypeScript]);
+
+  // Persist config changes
+  useEffect(() => {
+    appStorage.saveConfig(config);
+  }, [config]);
 
   if (isSmallScreen) {
     return (

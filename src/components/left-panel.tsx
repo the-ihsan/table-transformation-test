@@ -9,6 +9,7 @@ import { Merge, RotateCcw, Split, TestTube, Settings } from "lucide-react";
 import type { Cell, MergeBoundary, TransformConfig } from "@/lib/types";
 import { adjustMergeBoundary, initializeTable } from "@/lib/utils";
 import { transformTable } from "@/lib/transform";
+import { appStorage } from "@/lib/storage";
 import {
   Popover,
   PopoverContent,
@@ -29,11 +30,21 @@ export function LeftPanel({
   config,
   setConfig,
 }: LeftPanelProps) {
-  const [table, setTable] = useState<Cell[][]>(() => initializeTable(3, 3));
-  const [rows, setRows] = useState(3);
-  const [cols, setCols] = useState(3);
+  // Load persisted table dimensions
+  const persistedDimensions = appStorage.loadTableDimensions(3, 3);
+  
+  const [table, setTable] = useState<Cell[][]>(() => {
+    const persistedTable = appStorage.loadTableData([]);
+    // If we have persisted table data, use it; otherwise initialize with persisted dimensions
+    return persistedTable.length > 0 ? persistedTable : initializeTable(persistedDimensions.rows, persistedDimensions.cols);
+  });
+  
+  const [rows, setRows] = useState(persistedDimensions.rows);
+  const [cols, setCols] = useState(persistedDimensions.cols);
   const [selection, setSelection] = useState<MergeBoundary | null>(null);
   const [currentCell, setCurrentCell] = useState<[number, number] | null>(null);
+  const [editingCell, setEditingCell] = useState<[number, number] | null>(null);
+  const [editingValue, setEditingValue] = useState("");
   const { transpose, repeatFirst, columnCount } = config;
 
   useEffect(() => {
@@ -41,6 +52,16 @@ export function LeftPanel({
     document.addEventListener("click", evt);
     return () => document.removeEventListener("click", evt);
   }, []);
+
+  // Persist table data changes
+  useEffect(() => {
+    appStorage.saveTableData(table);
+  }, [table]);
+
+  // Persist table dimensions changes
+  useEffect(() => {
+    appStorage.saveTableDimensions(rows, cols);
+  }, [rows, cols]);
 
   const handleCellMouseDown = (
     e: React.MouseEvent<HTMLTableCellElement>,
@@ -57,6 +78,31 @@ export function LeftPanel({
       const left = Math.min(currentCell[1], col);
       setSelection(adjustMergeBoundary(table, { top, right, bottom, left }));
     }
+  };
+
+  const handleCellDoubleClick = (row: number, col: number) => {
+    setEditingCell([row, col]);
+    setEditingValue(table[row][col].value);
+  };
+
+  const handleCellEdit = (value: string) => {
+    setEditingValue(value);
+  };
+
+  const handleCellEditComplete = () => {
+    if (editingCell) {
+      const [row, col] = editingCell;
+      const newTable = [...table];
+      newTable[row][col].value = editingValue;
+      setTable(newTable);
+    }
+    setEditingCell(null);
+    setEditingValue("");
+  };
+
+  const handleCellEditCancel = () => {
+    setEditingCell(null);
+    setEditingValue("");
   };
 
   const isSelected = useCallback(
@@ -281,8 +327,27 @@ export function LeftPanel({
                           rowSpan={cell.rowSpan}
                           colSpan={cell.colSpan}
                           onMouseDown={(e) => handleCellMouseDown(e, i, j)}
+                          onDoubleClick={() => handleCellDoubleClick(i, j)}
                         >
-                          {cell.value}
+                          {editingCell && editingCell[0] === i && editingCell[1] === j ? (
+                            <input
+                              type="text"
+                              value={editingValue}
+                              onChange={(e) => handleCellEdit(e.target.value)}
+                              onBlur={handleCellEditComplete}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCellEditComplete();
+                                } else if (e.key === 'Escape') {
+                                  handleCellEditCancel();
+                                }
+                              }}
+                              className="w-full h-full text-center border-none outline-none bg-transparent"
+                              autoFocus
+                            />
+                          ) : (
+                            cell.value
+                          )}
                         </td>
                       );
                     })}
