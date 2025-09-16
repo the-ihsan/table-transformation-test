@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/header";
-import { LeftPanel } from "@/components/left-panel";
+import InputAndProjection from "@/components/input-and-projection";
 import { CodeEditor } from "@/components/code-editor";
 import type { TransformConfig } from "@/lib/types";
 import { executeUserCode } from "@/lib/code-executor";
 import { appStorage } from "@/lib/storage";
+import Output from "./output";
+import { cn } from "@/lib/utils";
 
 const defaultCode = {
   typescript: `interface Config {
@@ -26,13 +28,17 @@ export function TableEditor() {
   // Load persisted data on component mount
   const [code, setCode] = useState(() => {
     const savedLanguage = appStorage.loadLanguage(true);
-    const defaultCodeToUse = savedLanguage ? defaultCode.typescript : defaultCode.javascript;
+    const defaultCodeToUse = savedLanguage
+      ? defaultCode.typescript
+      : defaultCode.javascript;
     return appStorage.loadCode(defaultCodeToUse);
   });
-  
-  const [isTypeScript, setIsTypeScript] = useState(() => appStorage.loadLanguage(true));
+
+  const [isTypeScript, setIsTypeScript] = useState(() =>
+    appStorage.loadLanguage(true)
+  );
   const tableRef = useRef<HTMLTableElement | null>(null);
-  const [config, setConfig] = useState<TransformConfig>(() => 
+  const [config, setConfig] = useState<TransformConfig>(() =>
     appStorage.loadConfig({
       transpose: false,
       repeatFirst: false,
@@ -40,6 +46,11 @@ export function TableEditor() {
     })
   );
   const [output, setOutput] = useState("");
+
+  // Visibility state for different sections
+  const [showInput, setShowInput] = useState(true);
+  const [showOutput, setShowOutput] = useState(true);
+  const [showCodeEditor, setShowCodeEditor] = useState(true);
 
   // Check if screen width is less than 800px
   const [isSmallScreen, setIsSmallScreen] = useState(false);
@@ -99,21 +110,26 @@ export function TableEditor() {
     if (!table) {
       return;
     }
-    
+
     console.log("Running code", table);
-    
+
     try {
       const result = executeUserCode(code, isTypeScript, table, config);
-      
+
       if (result.success) {
         if (result.isTableElement) {
           // Output is a valid table element
-          setOutput(result.output || '');
-          console.log("✅ Code executed successfully - output is a table element");
+          setOutput(result.output || "");
+          console.log(
+            "✅ Code executed successfully - output is a table element"
+          );
         } else {
           // Output is not a table element
           setOutput(`⚠️ Output is not a table element:\n\n${result.output}`);
-          console.log("⚠️ Code executed but output is not a table element:", result.output);
+          console.log(
+            "⚠️ Code executed but output is not a table element:",
+            result.output
+          );
         }
       } else {
         // Error occurred (transpilation or execution)
@@ -121,7 +137,8 @@ export function TableEditor() {
         console.error("❌ Code execution failed:", result.error);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       setOutput(`❌ Unexpected Error: ${errorMessage}`);
       console.error("❌ Unexpected error:", error);
     }
@@ -131,19 +148,47 @@ export function TableEditor() {
     setConfig({ ...config, ...cfg });
   };
 
+  const halfCodeEditor = showInput || showOutput;
+
   return (
     <div className="h-screen flex flex-col bg-white">
-      <Header />
+      <Header
+        showInput={showInput}
+        setShowInput={setShowInput}
+        showOutput={showOutput}
+        setShowOutput={setShowOutput}
+        showCodeEditor={showCodeEditor}
+        setShowCodeEditor={setShowCodeEditor}
+      />
 
       <div className="flex-1 flex overflow-hidden">
-        <LeftPanel tableRef={tableRef} output={output} config={config} setConfig={onConfigChange} />
-        <CodeEditor
-          code={code}
-          onCodeChange={setCode}
-          isTypeScript={isTypeScript}
-          onTypeScriptChange={onTypeScriptChange}
-          onRunCode={onRunCode}
-        />
+        <div
+          className={`flex-1 flex flex-col border-r border-gray-200 ${
+            !showInput && !showOutput ? "hidden" : ""
+          }`}
+        >
+          <InputAndProjection
+            tableRef={tableRef}
+            setConfig={onConfigChange}
+            config={config}
+            className={showInput ? "" : "hidden"}
+          />
+          <Output output={output} className={showOutput ? "" : "hidden"} />
+        </div>
+        {showCodeEditor && (
+          <CodeEditor
+            code={code}
+            onCodeChange={setCode}
+            isTypeScript={isTypeScript}
+            onTypeScriptChange={onTypeScriptChange}
+            onRunCode={onRunCode}
+            className={cn({
+              hidden: !showCodeEditor,
+              "w-1/2": halfCodeEditor,
+              "w-full": !halfCodeEditor,
+            })}
+          />
+        )}
       </div>
     </div>
   );

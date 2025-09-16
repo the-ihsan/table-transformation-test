@@ -8,12 +8,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { HelpCircle, Trash2 } from "lucide-react";
+import { HelpCircle, Trash2, Eye, EyeOff } from "lucide-react";
 import { appStorage } from "@/lib/storage";
 import Help from "./help";
 import { useState } from "react";
 
-export function Header() {
+interface HeaderProps {
+  showInput: boolean;
+  setShowInput: (show: boolean) => void;
+  showOutput: boolean;
+  setShowOutput: (show: boolean) => void;
+  showCodeEditor: boolean;
+  setShowCodeEditor: (show: boolean) => void;
+}
+
+export function Header({ showInput, setShowInput, showOutput, setShowOutput, showCodeEditor, setShowCodeEditor }: HeaderProps) {
   const [showHelp, setShowHelp] = useState(false);
 
   const handleClearData = () => {
@@ -34,6 +43,36 @@ export function Header() {
           Table Transformation Editor
         </h1>
         <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInput(!showInput)}
+              className={showInput ? "text-blue-600 hover:text-blue-700 hover:bg-blue-50" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}
+            >
+              {showInput ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              Input
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowOutput(!showOutput)}
+              className={showOutput ? "text-blue-600 hover:text-blue-700 hover:bg-blue-50" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}
+            >
+              {showOutput ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              Output
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCodeEditor(!showCodeEditor)}
+              className={showCodeEditor ? "text-blue-600 hover:text-blue-700 hover:bg-blue-50" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}
+            >
+              {showCodeEditor ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              Code Editor
+            </Button>
+          </div>
+          <div className="w-px h-6 bg-gray-300"></div>
           <Button
             variant="outline"
             size="sm"

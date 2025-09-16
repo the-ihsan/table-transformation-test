@@ -10,6 +10,7 @@ interface CodeEditorProps {
   isTypeScript: boolean;
   onTypeScriptChange: (isTypeScript: boolean) => void;
   onRunCode: () => void;
+  className?: string;
 }
 
 export function CodeEditor({
@@ -18,13 +19,14 @@ export function CodeEditor({
   isTypeScript,
   onTypeScriptChange,
   onRunCode,
+  className,
 }: CodeEditorProps) {
   const handleCodeChange = (value: string | undefined) => {
     onCodeChange(value || "");
   };
 
   return (
-    <div className="w-1/2 flex flex-col">
+    <div className={`flex flex-col ${className}`}>
       <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900">
           Transformation Code

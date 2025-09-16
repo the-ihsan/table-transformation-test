@@ -1,13 +1,15 @@
-import type { Cell } from "./types";
+import type { Cell, TransformConfig } from "./types";
 
 export const transformTable = (
   table: Cell[][],
-  colCount: number,
-  transpose: boolean,
-  repeatFirst: boolean
+  config: TransformConfig
 ): Cell[][] => {
+  const { transpose, repeatFirst, columnCount } = config;
   if (transpose) {
-    const newTable: Cell[][] = Array.from({ length: table[0].length }, () => []);
+    const newTable: Cell[][] = Array.from(
+      { length: table[0].length },
+      () => []
+    );
     for (let r = 0; r < table[0].length; r++) {
       for (let c = 0; c < table.length; c++) {
         newTable[r][c] = table[c][r];
@@ -22,7 +24,7 @@ export const transformTable = (
 
   table = JSON.parse(JSON.stringify(table)) as Cell[][];
 
-  if (colCount >= table[0].length) {
+  if (columnCount >= table[0].length) {
     return table;
   }
 
@@ -48,7 +50,7 @@ export const transformTable = (
       };
       maxColspan = Math.max(maxColspan, cell.colSpan);
     });
-    if (maxColspan >= colCount) {
+    if (maxColspan >= columnCount) {
       return table;
     }
   }
@@ -78,7 +80,7 @@ export const transformTable = (
       subRow.push(cell);
 
       const colspan = cell.colSpan;
-      const left = colCount - subRowOfRow[r].filled;
+      const left = columnCount - subRowOfRow[r].filled;
       const spaceUsed = Math.min(colspan, left);
       subRowObj.filled += 1;
       if (spaceUsed < colspan) {
@@ -95,7 +97,7 @@ export const transformTable = (
         table[r][c + spaceUsed] = fillerProps;
       }
 
-      if (subRow.length === colCount) {
+      if (subRow.length === columnCount) {
         subRow = [];
         subRowObj.filled = 0;
         subRowObj.rows.push(subRow);
