@@ -140,36 +140,30 @@ export const runTest = (
   config: TransformConfig,
   output: HTMLTableElement
 ) => {
-  const outputTable = parseTable(output);
-  const expectedTable = transformTable(input, config);
-  if (outputTable.length !== expectedTable.length) {
-    // console.log("Table Length: ", outputTable.length, expectedTable.length);
+  const expectedTable = buildTableFromCells(transformTable(input, config));
+  if (output.rows.length !== expectedTable.rows.length) {
     return false;
   }
-  for (let i = 0; i < outputTable.length; i++) {
-    if (outputTable[i].length !== expectedTable[i].length) {
-      // console.log("Row Length: ", outputTable[i].length, expectedTable[i].length);
+  for (let i = 0; i < output.rows.length; i++) {
+    const oCells = output.rows[i].cells;
+    const eCells = expectedTable.rows[i].cells;
+    if (oCells.length !== eCells.length) {
       return false;
     }
-    for (let j = 0; j < outputTable[i].length; j++) {
-      const outputCell = outputTable[i][j];
-      const expectedCell = expectedTable[i][j];
+    for (let j = 0; j < oCells.length; j++) {
+      const oCell = oCells[j];
+      const eCell = eCells[j];
       if (
-        outputCell.value !== expectedCell.value ||
-        outputCell.rowSpan !== expectedCell.rowSpan ||
-        outputCell.colSpan !== expectedCell.colSpan
+        oCell.textContent !== eCell.textContent ||
+        oCell.rowSpan !== eCell.rowSpan ||
+        oCell.colSpan !== eCell.colSpan
       ) {
-        console.log(outputTable, expectedTable);
-        console.log("Cell Mismatch: ", i, j);
-        console.table(outputCell);
-        console.table(expectedCell);
         return false;
       }
     }
   }
   return true;
 };
-
 // ---------- Test Result Types ----------
 export interface TestResult {
   testCase: string;
