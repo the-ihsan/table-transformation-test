@@ -156,7 +156,10 @@ export function LeftPanel() {
 
   return (
     <div className="flex-1 flex flex-col border-r border-gray-200">
-      <Tabs defaultValue="input" className="flex-1 flex flex-col h-full">
+      <Tabs
+        defaultValue="input"
+        className="flex-1 flex flex-col overflow-hidden"
+      >
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <TabsList className="grid w-[200px] grid-cols-2">
@@ -244,7 +247,7 @@ export function LeftPanel() {
               </Button>
             </div>
           </div>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto shadow-sm">
             <table
               ref={tableRef}
               className="border-collapse w-full"
@@ -286,99 +289,100 @@ export function LeftPanel() {
           value="projection"
           className="flex-1 flex flex-col overflow-hidden shadow-sm p-6 m-0"
         >
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="text-gray-900 mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Projection Table</h2>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Transform Settings
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-4 bg-white shadow-lg rounded-lg" align="end">
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900">
-                      Transformation Controls
-                    </h3>
+          <div className="text-gray-900 mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Projection Table</h2>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Transform Settings
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-80 p-4 bg-white shadow-lg rounded-lg"
+                align="end"
+              >
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900">
+                    Transformation Controls
+                  </h3>
 
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="transform"
-                        checked={transform}
-                        onCheckedChange={setTransform}
-                      />
-                      <Label htmlFor="transform">Transform (Transpose)</Label>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="repeat-first"
-                        checked={repeatFirst}
-                        onCheckedChange={setRepeatFirst}
-                      />
-                      <Label htmlFor="repeat-first">Repeat First</Label>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="column-count">Column Count</Label>
-                      <Input
-                        id="column-count"
-                        type="number"
-                        value={columnCount}
-                        onChange={(e) =>
-                          setColumnCount(
-                            Math.max(1, Number.parseInt(e.target.value) || 1)
-                          )
-                        }
-                        className="w-full"
-                        min="1"
-                      />
-                      {hasRepeatFirstError && (
-                        <p className="text-sm text-red-600">
-                          Column count should be ≥ 2 when repeat first is
-                          enabled
-                        </p>
-                      )}
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="transform"
+                      checked={transform}
+                      onCheckedChange={setTransform}
+                    />
+                    <Label htmlFor="transform">Transform (Transpose)</Label>
                   </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-            {hasRepeatFirstError ? (
-              <div className="flex-1 text-center py-8 text-gray-500 bg-gray-50 rounded-lg flex items-center justify-center">
-                Fix the error in transformation settings to see the preview
-              </div>
-            ) : (
-              <div className="flex-1 overflow-auto">
-                <table className="border-collapse w-full">
-                  <tbody>
-                    {transformedTable.map((row, i) => (
-                      <tr key={i}>
-                        {row.map((cell, j) => {
-                          if (cell.hidden) return null;
-                          return (
-                            <td
-                              key={j}
-                              className={`border border-gray-300 p-3 min-w-[80px] h-[50px] text-center bg-gray-50 ${
-                                cell.shadow ? "opacity-25" : ""
-                              }`}
-                              rowSpan={cell.rowSpan}
-                              colSpan={cell.colSpan}
-                            >
-                              {cell.value}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="repeat-first"
+                      checked={repeatFirst}
+                      onCheckedChange={setRepeatFirst}
+                    />
+                    <Label htmlFor="repeat-first">Repeat First</Label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="column-count">Column Count</Label>
+                    <Input
+                      id="column-count"
+                      type="number"
+                      value={columnCount}
+                      onChange={(e) =>
+                        setColumnCount(
+                          Math.max(1, Number.parseInt(e.target.value) || 1)
+                        )
+                      }
+                      className="w-full"
+                      min="1"
+                    />
+                    {hasRepeatFirstError && (
+                      <p className="text-sm text-red-600">
+                        Column count should be ≥ 2 when repeat first is enabled
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
+          {hasRepeatFirstError ? (
+            <div className="flex-1 text-center py-8 text-gray-500 bg-gray-50 rounded-lg flex items-center justify-center">
+              Fix the error in transformation settings to see the preview
+            </div>
+          ) : (
+            <div className="flex-1 overflow-auto shadow-sm">
+              <table className="border-collapse w-full">
+                <tbody>
+                  {transformedTable.map((row, i) => (
+                    <tr key={i}>
+                      {row.map((cell, j) => {
+                        if (cell.hidden) return null;
+                        return (
+                          <td
+                            key={j}
+                            className={`border border-gray-300 p-3 min-w-[80px] h-[50px] text-center bg-gray-50 ${
+                              cell.shadow ? "opacity-25" : ""
+                            }`}
+                            rowSpan={cell.rowSpan}
+                            colSpan={cell.colSpan}
+                          >
+                            {cell.value}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
+      <div className="flex-1 overflow-hidden"></div>
     </div>
   );
 }
