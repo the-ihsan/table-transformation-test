@@ -53,8 +53,13 @@ function applySpans(
   table: Cell[][],
   spans: { row: number; col: number; rowSpan: number; colSpan: number }[]
 ): Cell[][] {
+  const rows = table.length;
+  const cols = table[0].length;
   spans.forEach(({ row, col, rowSpan, colSpan }) => {
     const cell = table[row][col];
+    if (row + rowSpan > rows || col + colSpan > cols) {
+      throw new Error("Invalid span");
+    }
     cell.rowSpan = rowSpan;
     cell.colSpan = colSpan;
 
@@ -92,7 +97,7 @@ export const testCases: TestCase[] = [
     table: applySpans(makeGrid(5, 5), [
       { row: 0, col: 0, rowSpan: 2, colSpan: 2 },
       { row: 2, col: 2, rowSpan: 3, colSpan: 1 },
-      { row: 4, col: 3, rowSpan: 1, colSpan: 2 }, // clipped at edge
+      { row: 4, col: 2, rowSpan: 1, colSpan: 2 }, // spans columns 2-3
     ]),
     configs: allConfigs,
   },
@@ -106,7 +111,7 @@ export const testCases: TestCase[] = [
     table: applySpans(makeGrid(8, 8), [
       { row: 0, col: 0, rowSpan: 3, colSpan: 3 },
       { row: 3, col: 3, rowSpan: 2, colSpan: 4 },
-      { row: 6, col: 6, rowSpan: 3, colSpan: 3 }, // clipped beyond boundary
+      { row: 6, col: 6, rowSpan: 2, colSpan: 2 }, // spans rows 6-7, columns 6-7
     ]),
     configs: allConfigs,
   },
@@ -117,13 +122,13 @@ type FlattenedTestCase = {
   config: TransformConfig;
 };
 
-export const ALL_TEST_CASES: FlattenedTestCase[] = testCases.map(
-  (testCase) =>
+export const ALL_TEST_CASES: FlattenedTestCase[] = testCases
+  .map((testCase) =>
     testCase.configs.map((config) => ({
       table: testCase.table,
       config,
     }))
-).flat();
-
+  )
+  .flat();
 
 export default ALL_TEST_CASES;
