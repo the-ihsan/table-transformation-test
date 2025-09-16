@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Merge, RotateCcw, Split, TestTube, Settings } from "lucide-react";
-import type { Cell, MergeBoundary } from "@/lib/types";
+import type { Cell, MergeBoundary, TransformConfig } from "@/lib/types";
 import { adjustMergeBoundary, initializeTable } from "@/lib/utils";
 import { transformTable } from "@/lib/transform";
 import {
@@ -16,18 +16,25 @@ import {
 } from "@radix-ui/react-popover";
 import { Switch } from "@/components/ui/switch";
 
-export function LeftPanel() {
-  const tableRef = useRef<HTMLTableElement>(null);
+interface LeftPanelProps {
+  tableRef: React.RefObject<HTMLTableElement | null>;
+  output: string;
+  config: TransformConfig;
+  setConfig: (config: Partial<TransformConfig>) => void;
+}
 
+export function LeftPanel({
+  tableRef,
+  output,
+  config,
+  setConfig,
+}: LeftPanelProps) {
   const [table, setTable] = useState<Cell[][]>(() => initializeTable(3, 3));
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
   const [selection, setSelection] = useState<MergeBoundary | null>(null);
   const [currentCell, setCurrentCell] = useState<[number, number] | null>(null);
-
-  const [transform, setTransform] = useState(false);
-  const [repeatFirst, setRepeatFirst] = useState(false);
-  const [columnCount, setColumnCount] = useState(3);
+  const { transpose, repeatFirst, columnCount } = config;
 
   useEffect(() => {
     const evt = () => setCurrentCell(null);
@@ -149,8 +156,8 @@ export function LeftPanel() {
   }, [rows, cols]);
 
   const transformedTable = useMemo(() => {
-    return transformTable(table, columnCount, transform, repeatFirst);
-  }, [table, columnCount, transform, repeatFirst]);
+    return transformTable(table, columnCount, transpose, repeatFirst);
+  }, [table, columnCount, transpose, repeatFirst]);
 
   const hasRepeatFirstError = repeatFirst && columnCount < 2;
 
@@ -160,7 +167,7 @@ export function LeftPanel() {
         defaultValue="input"
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-4 py-1 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <TabsList className="grid w-[200px] grid-cols-2">
               <TabsTrigger value="input">Input</TabsTrigger>
@@ -217,9 +224,10 @@ export function LeftPanel() {
 
         <TabsContent
           value="input"
-          className="flex-1 flex flex-col overflow-hidden shadow p-6 m-0"
+          className="flex-1 flex flex-col overflow-hidden shadow px-4 py-2 m-0"
+          forceMount
         >
-          <div className="text-gray-900 mb-4 flex items-center justify-between">
+          <div className="text-gray-900 mb-2 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Input Table</h2>
             <div className="flex items-center gap-2">
               <Button
@@ -287,9 +295,10 @@ export function LeftPanel() {
 
         <TabsContent
           value="projection"
-          className="flex-1 flex flex-col overflow-hidden shadow-sm p-6 m-0"
+          className="flex-1 flex flex-col overflow-hidden shadow-sm px-4 py-2 m-0"
+          forceMount
         >
-          <div className="text-gray-900 mb-4 flex items-center justify-between">
+          <div className="text-gray-900 mb-2 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Projection Table</h2>
             <Popover>
               <PopoverTrigger asChild>
@@ -310,8 +319,10 @@ export function LeftPanel() {
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="transform"
-                      checked={transform}
-                      onCheckedChange={setTransform}
+                      checked={transpose}
+                      onCheckedChange={() =>
+                        setConfig({ transpose: !transpose })
+                      }
                     />
                     <Label htmlFor="transform">Transform (Transpose)</Label>
                   </div>
@@ -320,7 +331,9 @@ export function LeftPanel() {
                     <Switch
                       id="repeat-first"
                       checked={repeatFirst}
-                      onCheckedChange={setRepeatFirst}
+                      onCheckedChange={() =>
+                        setConfig({ repeatFirst: !repeatFirst })
+                      }
                     />
                     <Label htmlFor="repeat-first">Repeat First</Label>
                   </div>
@@ -332,9 +345,12 @@ export function LeftPanel() {
                       type="number"
                       value={columnCount}
                       onChange={(e) =>
-                        setColumnCount(
-                          Math.max(1, Number.parseInt(e.target.value) || 1)
-                        )
+                        setConfig({
+                          columnCount: Math.max(
+                            1,
+                            Number.parseInt(e.target.value) || 1
+                          ),
+                        })
                       }
                       className="w-full"
                       min="1"
@@ -382,7 +398,13 @@ export function LeftPanel() {
           )}
         </TabsContent>
       </Tabs>
-      <div className="flex-1 overflow-hidden"></div>
+      <div className="flex-1 overflow-hidden flex flex-col px-4 py-2">
+        <h2 className="text-lg font-semibold py-2 border-y">Output</h2>
+        <div
+          className="flex-1 overflow-auto shadow-sm"
+          dangerouslySetInnerHTML={{ __html: output }}
+        />
+      </div>
     </div>
   );
 }

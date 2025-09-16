@@ -19,3 +19,10 @@ export interface MergeBoundary {
   bottom: number;
   left: number;
 }
+
+
+export interface TransformConfig {
+  transpose: boolean;
+  repeatFirst: boolean;
+  columnCount: number;
+}

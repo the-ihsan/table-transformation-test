@@ -1,12 +1,15 @@
 import Editor from "@monaco-editor/react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "./ui/button";
+import { Play } from "lucide-react";
 
 interface CodeEditorProps {
   code: string;
   onCodeChange: (code: string) => void;
   isTypeScript: boolean;
   onTypeScriptChange: (isTypeScript: boolean) => void;
+  onRunCode: () => void;
 }
 
 export function CodeEditor({
@@ -14,6 +17,7 @@ export function CodeEditor({
   onCodeChange,
   isTypeScript,
   onTypeScriptChange,
+  onRunCode,
 }: CodeEditorProps) {
   const handleCodeChange = (value: string | undefined) => {
     onCodeChange(value || "");
@@ -26,6 +30,9 @@ export function CodeEditor({
           Transformation Code
         </h2>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={onRunCode}>
+            <Play className="w-4 h-4" /> Run Code
+          </Button>
           <Label htmlFor="typescript-switch" className="text-sm font-medium">
             TypeScript
           </Label>

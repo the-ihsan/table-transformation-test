@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/header";
 import { LeftPanel } from "@/components/left-panel";
 import { CodeEditor } from "@/components/code-editor";
+import type { TransformConfig } from "@/lib/types";
+import { executeUserCode } from "@/lib/code-executor";
 
 const defaultCode = {
   typescript: `interface Config {
@@ -22,6 +24,13 @@ function transformTable(table: HTMLTableElement, config: Config): HTMLTableEleme
 export function TableEditor() {
   const [code, setCode] = useState(defaultCode.typescript);
   const [isTypeScript, setIsTypeScript] = useState(true);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [config, setConfig] = useState<TransformConfig>({
+    transpose: false,
+    repeatFirst: false,
+    columnCount: 3,
+  });
+  const [output, setOutput] = useState("");
 
   // Check if screen width is less than 800px
   const [isSmallScreen, setIsSmallScreen] = useState(false);
@@ -61,17 +70,55 @@ export function TableEditor() {
     }
   };
 
+  const onRunCode = () => {
+    const table = tableRef.current?.cloneNode(true) as HTMLTableElement;
+    if (!table) {
+      return;
+    }
+    
+    console.log("Running code", table);
+    
+    try {
+      const result = executeUserCode(code, isTypeScript, table, config);
+      
+      if (result.success) {
+        if (result.isTableElement) {
+          // Output is a valid table element
+          setOutput(result.output || '');
+          console.log("✅ Code executed successfully - output is a table element");
+        } else {
+          // Output is not a table element
+          setOutput(`⚠️ Output is not a table element:\n\n${result.output}`);
+          console.log("⚠️ Code executed but output is not a table element:", result.output);
+        }
+      } else {
+        // Error occurred (transpilation or execution)
+        setOutput(`❌ Error: ${result.error}`);
+        console.error("❌ Code execution failed:", result.error);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setOutput(`❌ Unexpected Error: ${errorMessage}`);
+      console.error("❌ Unexpected error:", error);
+    }
+  };
+
+  const onConfigChange = (cfg: Partial<TransformConfig>) => {
+    setConfig({ ...config, ...cfg });
+  };
+
   return (
     <div className="h-screen flex flex-col bg-white">
       <Header />
 
       <div className="flex-1 flex overflow-hidden">
-        <LeftPanel />
+        <LeftPanel tableRef={tableRef} output={output} config={config} setConfig={onConfigChange} />
         <CodeEditor
           code={code}
           onCodeChange={setCode}
           isTypeScript={isTypeScript}
           onTypeScriptChange={onTypeScriptChange}
+          onRunCode={onRunCode}
         />
       </div>
     </div>
